@@ -1,1 +1,858 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Brighter Future — Sunrise Run (v2)</title>
+  <style>
+    :root { color-scheme: light; }
+    body { margin:0; background:#f7f5f0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 14px; }
+    .hud{
+      display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between;
+      padding:10px 12px; border:1px solid #e6e0d6; border-radius:14px; background:#fff;
+      box-shadow: 0 6px 20px rgba(0,0,0,.05);
+    }
+    .brand{ display:flex; gap:10px; align-items:center; }
+    .dot{ width:14px; height:14px; border-radius:999px; background:#d08a55; box-shadow:0 0 0 3px rgba(208,138,85,.18);}
+    .title{ font-weight:900; letter-spacing:.2px; }
+    .muted{ color:#6b665f; font-size:13px; }
+    .stats{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:flex-end; }
+    .pill{ padding:6px 10px; border-radius:999px; background:#f3efe7; border:1px solid #e6e0d6; font-size:13px; }
+    .pill b{ font-weight:800; }
+    canvas{
+      width:100%; height:auto; display:block; margin-top:12px;
+      background:#fff; border:1px solid #e6e0d6; border-radius:18px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.06);
+      touch-action:none;
+    }
+    .controls{
+      margin-top:10px; display:flex; gap:10px; flex-wrap:wrap; justify-content:space-between; align-items:center;
+    }
+    button{
+      appearance:none; border:1px solid #e6e0d6; background:#fff; border-radius:12px;
+      padding:10px 12px; font-weight:800; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,.05);
+    }
+    button.primary{ background:#111; color:#fff; border-color:#111; }
+    button.warn{ background:#d08a55; color:#111; border-color:#d08a55; }
+    .tip{ font-size:13px; color:#6b665f; }
 
+    /* Modal */
+    .backdrop{
+      position:fixed; inset:0; background: rgba(20,32,44,.35);
+      display:none; align-items:center; justify-content:center; padding:14px;
+    }
+    .modal{
+      width:min(720px, 100%); background:#fff; border:1px solid #e6e0d6; border-radius:18px;
+      box-shadow: 0 18px 60px rgba(0,0,0,.2); overflow:hidden;
+    }
+    .modalHead{ padding:14px 14px 10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; gap:10px; align-items:flex-start;}
+    .modalHead .h{ font-weight:900; font-size:16px; }
+    .modalHead .s{ color:#6b665f; font-size:13px; margin-top:2px; }
+    .modalBody{ padding:14px; display:grid; gap:12px; }
+    .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    .card{
+      border:1px solid #e6e0d6; border-radius:14px; padding:12px; background:#fff;
+    }
+    .row{ display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .small{ font-size:13px; color:#6b665f; }
+    .big{ font-weight:900; font-size:18px; }
+    .btnRow{ display:flex; flex-wrap:wrap; gap:10px; }
+    .btnRow button{ flex:1; min-width: 120px; }
+    .list{ display:grid; gap:10px; }
+    .partner{
+      border:1px solid #e6e0d6; border-radius:14px; padding:10px; display:flex; justify-content:space-between; align-items:center; gap:10px;
+      background:#faf9f6;
+    }
+    .partner b{ font-weight:900; }
+    .tag{ font-size:12px; padding:4px 8px; border-radius:999px; border:1px solid #e6e0d6; background:#fff; color:#111; white-space:nowrap;}
+    .closeX{ border:none; background:transparent; box-shadow:none; font-size:18px; padding:6px 10px; cursor:pointer; }
+    .disabled{ opacity:.55; pointer-events:none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hud">
+      <div class="brand">
+        <div class="dot" aria-hidden="true"></div>
+        <div>
+          <div class="title">Brighter Future — Sunrise Run</div>
+          <div class="muted">Hoppa • Samla sol • Tjäna BF Coins • Uppgradera • Stötta en rörelse</div>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="pill">Poäng: <b><span id="score">0</span></b></div>
+        <div class="pill">BF Coins: <b><span id="coins">0</span></b></div>
+        <div class="pill">Streak: <b><span id="streak">0</span></b></div>
+        <div class="pill">Bäst: <b><span id="best">0</span></b></div>
+      </div>
+    </div>
+
+    <canvas id="c" width="960" height="540"></canvas>
+
+    <div class="controls">
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <button class="primary" id="startBtn">Starta / Starta om</button>
+        <button id="pauseBtn">Pausa</button>
+        <button class="warn" id="shopBtn">Shop</button>
+      </div>
+      <div class="tip">
+        Mobil: <b>tryck</b> för hopp. Dator: <b>Space</b>. Paus: <b>P</b>.
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL -->
+  <div class="backdrop" id="backdrop" role="dialog" aria-modal="true">
+    <div class="modal">
+      <div class="modalHead">
+        <div>
+          <div class="h" id="modalTitle">Shop</div>
+          <div class="s" id="modalSub">Spendera BF Coins och gör runs lättare + mer belönande.</div>
+        </div>
+        <button class="closeX" id="closeModal" aria-label="Stäng">✕</button>
+      </div>
+      <div class="modalBody" id="modalBody"></div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  // ========= EDIT THESE PAYMENT LINKS LATER =========
+  // Du kan byta till Stripe Payment Links eller Shopify “Donation”-produkter.
+  // Lämna som placeholder tills du har riktiga länkar.
+  const DONATION_LINKS = {
+    "Nyhammar Folkets Hus": {
+      10: "https://example.com/donate/nyhammar/10",
+      20: "https://example.com/donate/nyhammar/20",
+      50: "https://example.com/donate/nyhammar/50"
+    },
+    "KIF Örebro DFF": {
+      10: "https://example.com/donate/kif/10",
+      20: "https://example.com/donate/kif/20",
+      50: "https://example.com/donate/kif/50"
+    },
+    "Skol IF Svärdsjöskolan": {
+      10: "https://example.com/donate/skolif/10",
+      20: "https://example.com/donate/skolif/20",
+      50: "https://example.com/donate/skolif/50"
+    },
+    "Kvinnojouren Lidingö & Trust": {
+      10: "https://example.com/donate/jour/10",
+      20: "https://example.com/donate/jour/20",
+      50: "https://example.com/donate/jour/50"
+    },
+    "Essinge Rovers": {
+      10: "https://example.com/donate/essinge/10",
+      20: "https://example.com/donate/essinge/20",
+      50: "https://example.com/donate/essinge/50"
+    }
+  };
+  // =================================================
+
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+
+  const scoreEl = document.getElementById("score");
+  const coinsEl = document.getElementById("coins");
+  const streakEl = document.getElementById("streak");
+  const bestEl = document.getElementById("best");
+
+  const startBtn = document.getElementById("startBtn");
+  const pauseBtn = document.getElementById("pauseBtn");
+  const shopBtn = document.getElementById("shopBtn");
+
+  const backdrop = document.getElementById("backdrop");
+  const closeModalBtn = document.getElementById("closeModal");
+  const modalTitle = document.getElementById("modalTitle");
+  const modalSub = document.getElementById("modalSub");
+  const modalBody = document.getElementById("modalBody");
+
+  // --- crisp scaling ---
+  function resizeCanvas(){
+    const cssW = canvas.clientWidth;
+    const cssH = Math.round(cssW * (540/960));
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.style.height = cssH + "px";
+    canvas.width = Math.floor(cssW * dpr);
+    canvas.height = Math.floor(cssH * dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  window.addEventListener("resize", resizeCanvas);
+  resizeCanvas();
+
+  // --- storage ---
+  const STORE_KEY = "bf_sr_v2";
+  const defaultSave = {
+    coins: 0,
+    best: 0,
+    streakDays: 0,
+    streakDate: "",
+
+    // Upgrades
+    magnetLvl: 0,   // pulls suns toward player
+    shieldLvl: 0,   // 0/1/2 rescues per run
+    doubleCoins: 0, // consumable: 0/1 (next run)
+    skin: 0         // 0..n
+  };
+  function loadSave(){
+    try{
+      const raw = localStorage.getItem(STORE_KEY);
+      if(!raw) return { ...defaultSave };
+      const parsed = JSON.parse(raw);
+      return { ...defaultSave, ...parsed };
+    } catch {
+      return { ...defaultSave };
+    }
+  }
+  function saveSave(){
+    localStorage.setItem(STORE_KEY, JSON.stringify(save));
+  }
+  let save = loadSave();
+
+  // daily streak (simple)
+  function yyyy_mm_dd(d){
+    const x = new Date(d);
+    const y = x.getFullYear();
+    const m = String(x.getMonth()+1).padStart(2,"0");
+    const da = String(x.getDate()).padStart(2,"0");
+    return `${y}-${m}-${da}`;
+  }
+  function updateDailyStreak(){
+    const today = yyyy_mm_dd(Date.now());
+    const last = save.streakDate || "";
+    if(!last){
+      save.streakDays = 1;
+      save.streakDate = today;
+      saveSave();
+      return;
+    }
+    if(last === today) return;
+
+    const lastDate = new Date(last + "T00:00:00");
+    const todayDate = new Date(today + "T00:00:00");
+    const diffDays = Math.round((todayDate - lastDate)/(1000*60*60*24));
+
+    if(diffDays === 1) save.streakDays = Math.min(999, (save.streakDays||0)+1);
+    else save.streakDays = 1;
+
+    save.streakDate = today;
+    saveSave();
+  }
+  updateDailyStreak();
+
+  const colors = {
+    terracotta: "#d08a55",
+    deep: "#14202c",
+    sand: "#e8dcc8",
+    ink: "#111111",
+    shadow: "#2c2c2c"
+  };
+  const SKINS = [
+    { name:"Classic", sun:"#d08a55", deep:"#14202c", sand:"#e8dcc8" },
+    { name:"Copper Night", sun:"#c77b4d", deep:"#0f1a24", sand:"#e6d7c2" },
+    { name:"Warm Sand", sun:"#d18b56", deep:"#1a2733", sand:"#efe3d0" }
+  ];
+
+  // --- game state ---
+  const state = {
+    running:false,
+    paused:false,
+    speed: 290,
+    gravity: 1850,
+    jumpVel: -690,
+    groundY: 0,
+    t: 0,
+    score: 0,
+    streak: 0,
+
+    // run-limited
+    shieldsLeft: 0,
+    coinMultiplier: 1
+  };
+
+  const player = { x: 140, y: 0, w: 34, h: 44, vy: 0, onGround:true };
+
+  let obstacles = [];
+  let suns = [];
+  let nextObstacleIn = 0;
+  let nextSunIn = 0;
+
+  function setSkin(){
+    const skin = SKINS[save.skin % SKINS.length];
+    colors.terracotta = skin.sun;
+    colors.deep = skin.deep;
+    colors.sand = skin.sand;
+  }
+  setSkin();
+
+  function sek(n){ return Math.floor(n); }
+
+  function updateHUD(){
+    scoreEl.textContent = Math.floor(state.score);
+    coinsEl.textContent = save.coins;
+    streakEl.textContent = save.streakDays || 1;
+    bestEl.textContent = save.best || 0;
+  }
+  updateHUD();
+
+  function resetRun(){
+    state.running = true;
+    state.paused = false;
+    state.t = 0;
+    state.speed = 290;
+    state.score = 0;
+    state.streak = 0;
+
+    obstacles = [];
+    suns = [];
+    nextObstacleIn = 0.85;
+    nextSunIn = 0.55;
+
+    player.y = 0;
+    player.vy = 0;
+    player.onGround = true;
+
+    // apply upgrades
+    state.shieldsLeft = Math.min(2, save.shieldLvl); // 0..2
+    state.coinMultiplier = (save.doubleCoins > 0) ? 2 : 1;
+
+    updateHUD();
+  }
+
+  function jump(){
+    if(!state.running || state.paused) return;
+    if(player.onGround){
+      player.vy = state.jumpVel;
+      player.onGround = false;
+    }
+  }
+
+  function togglePause(){
+    if(!state.running) return;
+    state.paused = !state.paused;
+    pauseBtn.textContent = state.paused ? "Fortsätt" : "Pausa";
+  }
+
+  function rand(min,max){ return Math.random()*(max-min)+min; }
+  function aabb(a,b){ return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y; }
+
+  function spawnObstacle(){
+    const W = canvas.clientWidth, H = canvas.clientHeight;
+    const ground = H - 78;
+    const w = rand(24, 42);
+    const h = rand(46, 120);
+    obstacles.push({ x: W+40, y: ground-h, w, h, passed:false });
+  }
+  function spawnSun(){
+    const W = canvas.clientWidth, H = canvas.clientHeight;
+    const ground = H - 78;
+    const r = 14;
+    suns.push({
+      x: W+40,
+      y: rand(ground-180, ground-92),
+      r, w:r*2, h:r*2,
+      collected:false
+    });
+  }
+
+  function coinsFromRun(finalScore){
+    // Addiction-friendly: coins always feel "something"
+    // Base: 5 coins for showing up
+    // + score-based
+    // + streak bonus
+    const base = 5;
+    const scoreCoins = Math.floor(finalScore / 20); // 1 coin per 20 points
+    const streakBonus = Math.min(15, Math.floor((save.streakDays || 1) / 3)); // +1 coin per 3-day streak (cap 15)
+    const mult = state.coinMultiplier;
+    return (base + scoreCoins + streakBonus) * mult;
+  }
+
+  function gameOver(){
+    state.running = false;
+    state.paused = false;
+    pauseBtn.textContent = "Pausa";
+
+    // consume doubleCoins if used
+    if(save.doubleCoins > 0){
+      save.doubleCoins = 0;
+    }
+
+    // update best
+    const runScore = Math.floor(state.score);
+    save.best = Math.max(save.best || 0, runScore);
+
+    // award coins
+    const earned = coinsFromRun(runScore);
+    save.coins = Math.max(0, (save.coins || 0) + earned);
+    saveSave();
+    updateHUD();
+
+    openPostRunModal(runScore, earned);
+  }
+
+  // --- drawing ---
+  function drawBackground(){
+    const W = canvas.clientWidth, H = canvas.clientHeight;
+    const ground = H - 78;
+    state.groundY = ground;
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0,0,W,H);
+
+    // half sun
+    const sunR = 155;
+    const sunX = W*0.78;
+    const sunY = ground + 30;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, sunR, Math.PI, 2*Math.PI);
+    ctx.closePath();
+    ctx.fillStyle = colors.terracotta;
+    ctx.fill();
+
+    // horizon
+    ctx.strokeStyle = colors.sand;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(0, ground);
+    ctx.lineTo(W, ground);
+    ctx.stroke();
+
+    // skyline
+    ctx.fillStyle = colors.deep;
+    const skylineX = W*0.48;
+    const blocks = [
+      {w:22,h:52},{w:34,h:82},{w:18,h:60},{w:40,h:110},{w:26,h:70},
+      {w:16,h:44},{w:46,h:96},{w:20,h:66},{w:30,h:78}
+    ];
+    let x = skylineX;
+    for(const b of blocks){
+      ctx.fillRect(x, ground-b.h, b.w, b.h);
+      x += b.w + 10;
+    }
+
+    // ground band
+    ctx.fillStyle = "#f3efe7";
+    ctx.fillRect(0, ground, W, H-ground);
+  }
+
+  function drawPlayer(){
+    ctx.fillStyle = colors.deep;
+    ctx.fillRect(player.x, player.y, player.w, player.h);
+
+    ctx.strokeStyle = colors.sand;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(player.x + 0.5, player.y + 0.5, player.w - 1, player.h - 1);
+
+    // forward foot
+    ctx.fillStyle = colors.deep;
+    ctx.fillRect(player.x + player.w - 6, player.y + player.h - 6, 10, 6);
+
+    // shield indicator (tiny halo)
+    if(state.shieldsLeft > 0){
+      ctx.strokeStyle = colors.terracotta;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(player.x - 4, player.y - 4, player.w + 8, player.h + 8);
+    }
+  }
+
+  function drawObstacle(o){
+    ctx.fillStyle = colors.shadow;
+    ctx.fillRect(o.x, o.y, o.w, o.h);
+    ctx.strokeStyle = colors.sand;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(o.x + 0.5, o.y + 0.5, o.w - 1, o.h - 1);
+  }
+
+  function drawSun(s){
+    const cx = s.x + s.r, cy = s.y + s.r;
+    ctx.beginPath();
+    ctx.arc(cx, cy, s.r, 0, Math.PI*2);
+    ctx.closePath();
+    ctx.fillStyle = colors.terracotta;
+    ctx.fill();
+    ctx.strokeStyle = colors.sand;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  function drawOverlay(){
+    const W = canvas.clientWidth, H = canvas.clientHeight;
+
+    if(!state.running){
+      ctx.fillStyle = "rgba(20,32,44,.08)";
+      ctx.fillRect(0,0,W,H);
+
+      ctx.fillStyle = colors.ink;
+      ctx.font = "900 30px system-ui,-apple-system,Segoe UI,Roboto";
+      ctx.fillText("Sunrise Run", 28, 60);
+
+      ctx.fillStyle = "#333";
+      ctx.font = "700 16px system-ui,-apple-system,Segoe UI,Roboto";
+      ctx.fillText("Tryck för att hoppa. Samla sol. Undvik skuggor.", 28, 90);
+
+      ctx.fillStyle = colors.terracotta;
+      ctx.font = "900 20px system-ui,-apple-system,Segoe UI,Roboto";
+      ctx.fillText(`Bäst: ${save.best || 0} • BF Coins: ${save.coins || 0}`, 28, 122);
+
+      ctx.fillStyle = "#666";
+      ctx.font = "700 14px system-ui,-apple-system,Segoe UI,Roboto";
+      ctx.fillText("Starta spelet. Efter varje run kan du uppgradera + stötta en rörelse.", 28, 150);
+    }
+
+    if(state.paused && state.running){
+      ctx.fillStyle = "rgba(20,32,44,.12)";
+      ctx.fillRect(0,0,W,H);
+
+      ctx.fillStyle = colors.ink;
+      ctx.font = "900 32px system-ui,-apple-system,Segoe UI,Roboto";
+      ctx.fillText("PAUS", 28, 60);
+
+      ctx.fillStyle = "#444";
+      ctx.font = "700 16px system-ui,-apple-system,Segoe UI,Roboto";
+      ctx.fillText("Tryck Fortsätt eller P.", 28, 90);
+    }
+  }
+
+  // --- magnet behavior ---
+  function applyMagnet(dt){
+    const lvl = save.magnetLvl || 0;
+    if(lvl <= 0) return;
+    // stronger pull with level
+    const pull = 90 + lvl * 60; // px/s
+    const radius = 120 + lvl * 45;
+    const px = player.x + player.w/2;
+    const py = player.y + player.h/2;
+
+    for(const s of suns){
+      if(s.collected) continue;
+      const sx = s.x + s.r;
+      const sy = s.y + s.r;
+      const dx = px - sx;
+      const dy = py - sy;
+      const dist = Math.hypot(dx,dy);
+      if(dist > 0 && dist < radius){
+        const ux = dx / dist;
+        const uy = dy / dist;
+        s.x += ux * pull * dt;
+        s.y += uy * pull * dt;
+      }
+    }
+  }
+
+  // --- modal helpers ---
+  function openModal(){
+    backdrop.style.display = "flex";
+  }
+  function closeModal(){
+    backdrop.style.display = "none";
+  }
+  closeModalBtn.addEventListener("click", closeModal);
+  backdrop.addEventListener("click", (e) => { if(e.target === backdrop) closeModal(); });
+
+  function buy(cost, applyFn){
+    if((save.coins || 0) < cost) return false;
+    save.coins -= cost;
+    applyFn();
+    saveSave();
+    updateHUD();
+    return true;
+  }
+
+  function openShopModal(){
+    modalTitle.textContent = "Shop";
+    modalSub.textContent = "Spendera BF Coins. Uppgraderingar gör spelet mer belönande och lättare.";
+
+    const magnetCost = 120 + (save.magnetLvl||0)*160; // scaling
+    const shieldCost = 180 + (save.shieldLvl||0)*220; // scaling
+    const doubleCost = 90; // consumable
+    const skinCost = 140;  // cycles
+
+    modalBody.innerHTML = `
+      <div class="grid2">
+        <div class="card">
+          <div class="row"><div class="big">Magnet</div><div class="tag">Lvl ${save.magnetLvl||0}</div></div>
+          <div class="small">Solen dras mot dig. Fler coins, mer flow.</div>
+          <div class="row" style="margin-top:10px;">
+            <div class="small">Pris: <b>${magnetCost}</b> coins</div>
+            <button id="buyMagnet">Köp</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="row"><div class="big">Shield</div><div class="tag">Lvl ${save.shieldLvl||0}</div></div>
+          <div class="small">Räddar dig vid en kollision (1–2 ggr per run).</div>
+          <div class="row" style="margin-top:10px;">
+            <div class="small">Pris: <b>${shieldCost}</b> coins</div>
+            <button id="buyShield">Köp</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="row"><div class="big">Double Coins</div><div class="tag">Nästa run</div></div>
+          <div class="small">2× coins på nästa run (förbrukas vid game over).</div>
+          <div class="row" style="margin-top:10px;">
+            <div class="small">Pris: <b>${doubleCost}</b> coins</div>
+            <button id="buyDouble">Köp</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="row"><div class="big">Skin</div><div class="tag">${SKINS[save.skin%SKINS.length].name}</div></div>
+          <div class="small">Byt känsla. Samma spel, ny vibe.</div>
+          <div class="row" style="margin-top:10px;">
+            <div class="small">Pris: <b>${skinCost}</b> coins</div>
+            <button id="buySkin">Köp</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="big">Coins just nu: ${save.coins || 0}</div>
+            <div class="small">Tips: spela korta snabba runs — coins tickar upp snabbt.</div>
+          </div>
+          <button id="closeShop">Stäng</button>
+        </div>
+      </div>
+    `;
+
+    // wire buttons
+    modalBody.querySelector("#buyMagnet").addEventListener("click", () => {
+      const ok = buy(magnetCost, () => save.magnetLvl = Math.min(5, (save.magnetLvl||0)+1));
+      if(!ok) return;
+      openShopModal();
+    });
+    modalBody.querySelector("#buyShield").addEventListener("click", () => {
+      const ok = buy(shieldCost, () => save.shieldLvl = Math.min(2, (save.shieldLvl||0)+1));
+      if(!ok) return;
+      openShopModal();
+    });
+    modalBody.querySelector("#buyDouble").addEventListener("click", () => {
+      const ok = buy(doubleCost, () => save.doubleCoins = 1);
+      if(!ok) return;
+      openShopModal();
+    });
+    modalBody.querySelector("#buySkin").addEventListener("click", () => {
+      const ok = buy(skinCost, () => { save.skin = (save.skin||0)+1; setSkin(); });
+      if(!ok) return;
+      openShopModal();
+    });
+    modalBody.querySelector("#closeShop").addEventListener("click", closeModal);
+
+    openModal();
+  }
+
+  function openPostRunModal(runScore, earnedCoins){
+    modalTitle.textContent = "Run klar";
+    modalSub.textContent = "Belöning direkt. Uppgradera eller stötta en rörelse (10/20/50).";
+
+    const partners = Object.keys(DONATION_LINKS);
+
+    modalBody.innerHTML = `
+      <div class="grid2">
+        <div class="card">
+          <div class="row"><div class="big">Poäng</div><div class="tag">Run</div></div>
+          <div class="big" style="margin-top:6px;">${runScore}</div>
+          <div class="small">Bäst: ${save.best || 0}</div>
+        </div>
+        <div class="card">
+          <div class="row"><div class="big">Coins du fick</div><div class="tag">${state.coinMultiplier}×</div></div>
+          <div class="big" style="margin-top:6px;">+${earnedCoins}</div>
+          <div class="small">Coins totalt: ${save.coins || 0}</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="big">Vill du stötta en rörelse?</div>
+            <div class="small">Välj en partner, välj belopp. (Öppnar betal-länk.)</div>
+          </div>
+          <button id="openShopInline">Shop</button>
+        </div>
+        <div class="list" style="margin-top:10px;">
+          ${partners.map(name => `
+            <div class="partner">
+              <div>
+                <b>${name}</b>
+                <div class="small">Välj 10 / 20 / 50 kr</div>
+              </div>
+              <div class="btnRow">
+                <button class="donBtn" data-name="${encodeURIComponent(name)}" data-amt="10">10</button>
+                <button class="donBtn" data-name="${encodeURIComponent(name)}" data-amt="20">20</button>
+                <button class="donBtn" data-name="${encodeURIComponent(name)}" data-amt="50">50</button>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="big">En gång till?</div>
+            <div class="small">Snabba runs = snabb progression. Det ska kännas.</div>
+          </div>
+          <div class="btnRow" style="justify-content:flex-end;">
+            <button id="playAgain" class="primary">Spela igen</button>
+            <button id="closePost">Stäng</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    modalBody.querySelector("#openShopInline").addEventListener("click", openShopModal);
+    modalBody.querySelector("#playAgain").addEventListener("click", () => { closeModal(); resetRun(); });
+    modalBody.querySelector("#closePost").addEventListener("click", closeModal);
+
+    // Donation handlers
+    modalBody.querySelectorAll(".donBtn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const name = decodeURIComponent(btn.dataset.name);
+        const amt = Number(btn.dataset.amt);
+        const url = (DONATION_LINKS[name] && DONATION_LINKS[name][amt]) ? DONATION_LINKS[name][amt] : "";
+        if(!url || url.includes("example.com")){
+          alert("Donation-länkar är placeholders just nu.\n\nByt DONATION_LINKS i koden till dina riktiga betal-länkar (Stripe/Shopify).");
+          return;
+        }
+        window.open(url, "_blank", "noopener,noreferrer");
+      });
+    });
+
+    openModal();
+  }
+
+  // --- collision handling with shields ---
+  function handleObstacleCollision(){
+    if(state.shieldsLeft > 0){
+      state.shieldsLeft -= 1;
+      // knockback: clear nearby obstacle as "rescue"
+      obstacles.shift();
+      // small score penalty to keep it fair
+      state.score = Math.max(0, state.score - 20);
+      return;
+    }
+    gameOver();
+  }
+
+  // --- events ---
+  startBtn.addEventListener("click", () => {
+    closeModal();
+    resetRun();
+    pauseBtn.textContent = "Pausa";
+  });
+  pauseBtn.addEventListener("click", togglePause);
+  shopBtn.addEventListener("click", openShopModal);
+
+  window.addEventListener("keydown", (e) => {
+    if(e.code === "Space"){ e.preventDefault(); jump(); }
+    if(e.code === "KeyP") togglePause();
+    if(e.code === "KeyB") openShopModal();
+  }, { passive:false });
+
+  canvas.addEventListener("pointerdown", (e) => { e.preventDefault(); jump(); }, { passive:false });
+
+  // --- loop ---
+  let last = performance.now();
+  function tick(now){
+    const dt = Math.min((now-last)/1000, 0.033);
+    last = now;
+
+    if(state.running && !state.paused){
+      state.t += dt;
+
+      // speed ramps
+      state.speed = Math.min(560, state.speed + dt*12);
+
+      // physics
+      const groundTop = state.groundY - player.h;
+      player.vy += state.gravity * dt;
+      player.y += player.vy * dt;
+      if(player.y >= groundTop){
+        player.y = groundTop;
+        player.vy = 0;
+        player.onGround = true;
+      }
+
+      // spawn
+      nextObstacleIn -= dt;
+      if(nextObstacleIn <= 0){
+        spawnObstacle();
+        nextObstacleIn = rand(0.78, 1.22);
+      }
+      nextSunIn -= dt;
+      if(nextSunIn <= 0){
+        spawnSun();
+        nextSunIn = rand(0.48, 0.92);
+      }
+
+      // move
+      const vx = state.speed * dt;
+      obstacles.forEach(o => o.x -= vx);
+      suns.forEach(s => s.x -= vx);
+
+      // magnet
+      applyMagnet(dt);
+
+      // collisions
+      const pBox = { x: player.x, y: player.y, w: player.w, h: player.h };
+
+      for(const o of obstacles){
+        if(aabb(pBox, o)){
+          handleObstacleCollision();
+          break;
+        }
+        if(!o.passed && o.x + o.w < player.x){
+          o.passed = true;
+          state.score += 6;     // passing reward
+          state.streak += 1;
+        }
+      }
+
+      for(const s of suns){
+        if(s.collected) continue;
+        const sBox = { x: s.x, y: s.y, w: s.w, h: s.h };
+        if(aabb(pBox, sBox)){
+          s.collected = true;
+          state.score += 12;    // sun reward
+          state.streak += 1;
+        }
+      }
+
+      // cleanup
+      obstacles = obstacles.filter(o => o.x > -120);
+      suns = suns.filter(s => s.x > -120 && !s.collected);
+
+      // momentum trickle
+      state.score += dt * 2.2;
+
+      // update best live
+      if(Math.floor(state.score) > (save.best || 0)){
+        save.best = Math.floor(state.score);
+        saveSave();
+      }
+
+      updateHUD();
+    }
+
+    // draw
+    drawBackground();
+    obstacles.forEach(drawObstacle);
+    suns.forEach(drawSun);
+    if(state.running) drawPlayer();
+    drawOverlay();
+
+    requestAnimationFrame(tick);
+  }
+
+  // initial
+  state.running = false;
+  updateHUD();
+  requestAnimationFrame(tick);
+
+})();
+</script>
+</body>
+</html>
